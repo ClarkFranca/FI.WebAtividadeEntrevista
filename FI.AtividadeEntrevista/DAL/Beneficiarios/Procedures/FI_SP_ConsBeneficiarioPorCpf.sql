@@ -1,0 +1,16 @@
+﻿CREATE OR ALTER PROCEDURE FI_SP_ConsBeneficiarioPorCpf
+(
+    @CPF VARCHAR(11)
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT TOP 1
+        ID,
+        CPF,
+        NOME,
+        IDCLIENTE
+    FROM BENEFICIARIOS
+    WHERE CPF = @CPF
+END

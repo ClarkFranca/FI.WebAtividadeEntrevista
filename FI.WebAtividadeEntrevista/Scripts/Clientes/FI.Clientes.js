@@ -116,6 +116,11 @@ function salvarEdicaoInline(index) {
         return;
     }
 
+    if (!cpfValido(novoCPF)) {
+        ModalDialog("Atenção", "CPF inválido.");
+        return;
+    }
+
     if (beneficiarios.some((b, i) => b.CPF === novoCPF && i !== index)) {
         ModalDialog("Atenção", "Já existe um beneficiário com este CPF.");
         return;
@@ -143,6 +148,11 @@ $(document).ready(function () {
 
         if (!cpf || !nome) {
             ModalDialog("Atenção", "Informe CPF e Nome do beneficiário.");
+            return;
+        }
+
+        if (!cpfValido(cpf)) {
+            ModalDialog("Atenção", "CPF do beneficiário inválido.");
             return;
         }
 
@@ -175,10 +185,17 @@ $(document).ready(function () {
         e.preventDefault();
 
         var email = $("#Email").val();
+        var cpfCliente = $("#CPF").val();
 
         if (!validarEmailSimples(email)) {
             ModalDialog("Atenção", "O e-mail deve conter '@'");
             $("#Email").focus();
+            return;
+        }
+
+        if (!cpfValido(cpfCliente)) {
+            ModalDialog("Atenção", "CPF do cliente inválido.");
+            $("#CPF").focus();
             return;
         }
 
@@ -213,6 +230,43 @@ $(document).ready(function () {
         });
     });
 });
+
+function cpfValido(cpf) {
+    cpf = cpf.replace(/\D/g, "");
+
+    if (cpf.length !== 11)
+        return false;
+
+    if (/^(\d)\1+$/.test(cpf))
+        return false;
+
+    var soma = 0;
+    var resto;
+
+    for (var i = 1; i <= 9; i++)
+        soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11)
+        resto = 0;
+
+    if (resto !== parseInt(cpf.substring(9, 10)))
+        return false;
+
+    soma = 0;
+    for (var i = 1; i <= 10; i++)
+        soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11)
+        resto = 0;
+
+    if (resto !== parseInt(cpf.substring(10, 11)))
+        return false;
+
+    return true;
+}
+
 
 function ModalDialog(titulo, texto) {
     var id = Math.random().toString().replace('.', '');

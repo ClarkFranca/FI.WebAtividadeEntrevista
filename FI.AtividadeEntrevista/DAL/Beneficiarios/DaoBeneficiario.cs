@@ -26,7 +26,7 @@ namespace FI.AtividadeEntrevista.DAL
             {
                 new SqlParameter("Id", b.Id),
                 new SqlParameter("Nome", b.Nome),
-                new SqlParameter("CPF", b.CPF)
+                new SqlParameter("CPF", b.CPF.Replace(".", "").Replace("-", ""))
             };
 
             base.Executar("FI_SP_AltBeneficiario", parametros);
@@ -103,7 +103,6 @@ namespace FI.AtividadeEntrevista.DAL
             };
         }
 
-
         internal bool ExistePorCpf(long idCliente, string cpf)
         {
             var parametros = new List<SqlParameter>
@@ -117,7 +116,27 @@ namespace FI.AtividadeEntrevista.DAL
             return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0;
         }
 
+        internal Beneficiario ConsultarPorCpf(string cpf)
+        {
+            var parametros = new List<SqlParameter>
+            {
+                new SqlParameter("CPF", cpf.Replace(".", "").Replace("-", ""))
+            };
 
+            var ds = base.Consultar("FI_SP_ConsBeneficiarioPorCpf", parametros);
 
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return null;
+
+            var row = ds.Tables[0].Rows[0];
+
+            return new Beneficiario
+            {
+                Id = Convert.ToInt64(row["ID"]),
+                CPF = row["CPF"].ToString(),
+                Nome = row["NOME"].ToString(),
+                IdCliente = Convert.ToInt64(row["IDCLIENTE"])
+            };
+        }
     }
 }

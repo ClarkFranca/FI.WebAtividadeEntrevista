@@ -36,5 +36,9 @@ namespace FI.AtividadeEntrevista.BLL
         {
             return _dao.Consultar(idBeneficiario);
         }
+        public Beneficiario ConsultarPorCpf(string cpf)
+        {
+            return new DaoBeneficiario().ConsultarPorCpf(cpf);
+        }
     }
 }

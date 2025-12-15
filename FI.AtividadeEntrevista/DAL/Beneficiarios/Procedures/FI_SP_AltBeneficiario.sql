@@ -1,4 +1,4 @@
-﻿CREATE PROC FI_SP_AltBeneficiario
+﻿CREATE or ALTER PROC FI_SP_AltBeneficiario
 (
     @ID          BIGINT,
     @NOME        VARCHAR(100),

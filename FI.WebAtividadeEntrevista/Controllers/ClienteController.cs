@@ -15,7 +15,6 @@ namespace WebAtividadeEntrevista.Controllers
             return View();
         }
 
-
         public ActionResult Incluir()
         {
             return View();
@@ -69,6 +68,15 @@ namespace WebAtividadeEntrevista.Controllers
                 }
             }
 
+            var boCliente = new BoCliente();
+            var clienteExistente = boCliente.ConsultarPorCpf(model.CPF);
+
+            if (clienteExistente != null)
+            {
+                Response.StatusCode = 400;
+                return Json($"CPF {model.CPF} já está cadastrado para outro cliente.");
+            }
+
             new BoCliente().Incluir(cliente);
 
             return Json("Cadastro efetuado com sucesso");
@@ -90,23 +98,41 @@ namespace WebAtividadeEntrevista.Controllers
             }
             else
             {
+                var boCliente = new BoCliente();
+                var clienteExistente = boCliente.ConsultarPorCpf(model.CPF);
+
+                if (clienteExistente != null && clienteExistente.Id != model.Id)
+                {
+                    Response.StatusCode = 400;
+                    return Json($"CPF {model.CPF} já está cadastrado para outro cliente.");
+                }
+
                 if (model.Beneficiarios != null)
                 {
                     var boBenef = new BoBeneficiario();
 
                     foreach (var benef in model.Beneficiarios)
                     {
+                        if (benef.Id > 0)
+                        {
+                            var benefBanco = boBenef.Consultar(benef.Id);
+
+                            if (benefBanco == null)
+                                continue;
+
+                            if (benefBanco.CPF.Replace(".", "").Replace("-", "") ==
+                                benef.CPF.Replace(".", "").Replace("-", ""))
+                            {
+                                continue;
+                            }
+                        }
+
                         bool existe = boBenef.ExistePorCpf(model.Id, benef.CPF);
 
                         if (existe)
                         {
-                            var benefBanco = boBenef.Consultar(benef.Id);
-
-                            if (benefBanco == null || benefBanco.CPF != benef.CPF)
-                            {
-                                Response.StatusCode = 400;
-                                return Json($"CPF {benef.CPF} já está cadastrado para este cliente.");
-                            }
+                            Response.StatusCode = 400;
+                            return Json($"CPF {benef.CPF} já está cadastrado para este cliente.");
                         }
                     }
                 }
@@ -206,29 +232,40 @@ namespace WebAtividadeEntrevista.Controllers
             cpf = cpf.Replace(".", "").Replace("-", "");
 
             var bo = new BoBeneficiario();
+            var benefExistente = bo.ConsultarPorCpf(cpf);
 
-            // Verifica se existe CPF no banco (GLOBAL)
-            bool existe = bo.ExistePorCpf(idCliente, cpf);
+            bool existe = false;
 
-            // Se estiver editando
-            if (idBeneficiario > 0)
+            if (benefExistente != null)
             {
-                var benef = bo.Consultar(idBeneficiario);
-
-                // Ignora somente se:
-                // - o beneficiário existir
-                // - o CPF for o mesmo
-                // - o cliente for o mesmo
-                if (benef != null &&
-                    benef.CPF.Replace(".", "").Replace("-", "") == cpf &&
-                    benef.IdCliente == idCliente)
+                if (idBeneficiario == 0 || benefExistente.Id != idBeneficiario)
                 {
-                    existe = false;
+                    existe = true;
                 }
             }
 
             return Json(new { existe }, JsonRequestBehavior.AllowGet);
         }
 
+        [HttpGet]
+        public JsonResult ValidarCpfCliente(long idCliente, string cpf)
+        {
+            cpf = cpf.Replace(".", "").Replace("-", "");
+
+            var bo = new BoCliente();
+            var clienteExistente = bo.ConsultarPorCpf(cpf);
+
+            bool existe = false;
+
+            if (clienteExistente != null)
+            {
+                if (idCliente == 0 || clienteExistente.Id != idCliente)
+                {
+                    existe = true;
+                }
+            }
+
+            return Json(new { existe }, JsonRequestBehavior.AllowGet);
+        }
     }
 }

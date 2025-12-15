@@ -1,4 +1,4 @@
-﻿CREATE OR ALTER PROCEDURE FI_SP_BeneficiarioExistePorCpf
+﻿CREATE PROCEDURE FI_SP_BeneficiarioExistePorCpf
     @IDCLIENTE BIGINT,
     @CPF VARCHAR(11)
 AS

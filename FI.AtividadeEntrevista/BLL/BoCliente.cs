@@ -34,11 +34,9 @@ namespace FI.AtividadeEntrevista.BLL
 
             daoCliente.Alterar(cliente);
 
-            // Busca os beneficiários atuais do banco
             var beneficiariosBanco = daoBenef.ListarPorCliente(cliente.Id)
                                      ?? new List<Beneficiario>();
 
-            // CASO 1: veio NULL → remove todos
             if (cliente.Beneficiarios == null || !cliente.Beneficiarios.Any())
             {
                 foreach (var benef in beneficiariosBanco)
@@ -48,7 +46,6 @@ namespace FI.AtividadeEntrevista.BLL
                 return;
             }
 
-            // CASO 2: Excluir os que NÃO vieram da tela
             foreach (var benefBanco in beneficiariosBanco)
             {
                 if (!cliente.Beneficiarios.Any(b => b.Id == benefBanco.Id))
@@ -57,7 +54,6 @@ namespace FI.AtividadeEntrevista.BLL
                 }
             }
 
-            // CASO 3: Inserir ou Alterar
             foreach (var benef in cliente.Beneficiarios)
             {
                 benef.IdCliente = cliente.Id;
@@ -88,7 +84,6 @@ namespace FI.AtividadeEntrevista.BLL
 
             return cliente;
         }
-
         public void Excluir(long id)
         {
             new DaoCliente().Excluir(id);
@@ -108,5 +103,12 @@ namespace FI.AtividadeEntrevista.BLL
         {
             return new DaoCliente().VerificarExistencia(CPF);
         }
+
+        public Cliente ConsultarPorCpf(string cpf)
+        {
+            cpf = cpf.Replace(".", "").Replace("-", "");
+            return new DaoCliente().ConsultarPorCpf(cpf);
+        }
+
     }
 }
