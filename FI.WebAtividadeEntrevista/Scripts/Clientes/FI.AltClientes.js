@@ -10,7 +10,6 @@ function maskCPF(v) {
     return v;
 }
 
-
 function maskCEP(v) {
     v = v.replace(/\D/g, "");
     v = v.substring(0, 8);
@@ -76,6 +75,13 @@ function atualizarTabelaBenef() {
 }
 
 function editarBenefInline(index) {
+
+    if (indiceEdicaoBenef !== null && indiceEdicaoBenef !== index) {
+        atualizarTabelaBenef();
+    }
+
+    indiceEdicaoBenef = index;
+
     var linha = $(`tr[data-index="${index}"]`);
     var beneficiario = beneficiarios[index];
 
@@ -99,7 +105,6 @@ function editarBenefInline(index) {
         </button>
     `);
 }
-
 function salvarEdicaoInline(index) {
     var linha = $(`tr[data-index="${index}"]`);
     var novoCPF = linha.find('.cpf input').val();
@@ -110,17 +115,34 @@ function salvarEdicaoInline(index) {
         return;
     }
 
+    if (!cpfValido(novoCPF)) {
+        ModalDialog("Atenção", "CPF inválido.");
+        return;
+    }
+
     if (beneficiarios.some((b, i) => b.CPF === novoCPF && i !== index)) {
         ModalDialog("Atenção", "Já existe um beneficiário com este CPF.");
         return;
     }
 
-    beneficiarios[index].CPF = novoCPF;
-    beneficiarios[index].Nome = novoNome;
+    validarCpfBeneficiarioBanco(
+        novoCPF,
+        beneficiarios[index].Id,
+        function (existe) {
 
-    atualizarTabelaBenef();
+            if (existe) {
+                ModalDialog("Atenção", "Este CPF já está cadastrado no banco.");
+                return;
+            }
+
+            beneficiarios[index].CPF = novoCPF;
+            beneficiarios[index].Nome = novoNome;
+
+            indiceEdicaoBenef = null;
+            atualizarTabelaBenef();
+        }
+    );
 }
-
 
 function editarBeneficiario(index) {
     indiceEdicaoBenef = index;
@@ -135,22 +157,38 @@ function salvarEdicaoBeneficiario() {
     var cpf = $('#editCPF').val();
     var nome = $('#editNome').val();
 
+    if (!cpf || !nome) {
+        ModalDialog("Atenção", "Informe CPF e Nome.");
+        return;
+    }
+
     if (beneficiarios.some((b, i) => b.CPF === cpf && i !== indiceEdicaoBenef)) {
         ModalDialog("Atenção", "Já existe outro beneficiário com este CPF.");
         return;
     }
 
-    beneficiarios[indiceEdicaoBenef] = {
-        CPF: cpf,
-        Nome: nome
-    };
+    validarCpfBeneficiarioBanco(
+        cpf,
+        beneficiarios[indiceEdicaoBenef].Id,
+        function (existe) {
 
-    $('#modalEditarBenef').modal('hide');
-    atualizarTabelaBenef();
+            if (existe) {
+                ModalDialog("Atenção", "Este CPF já está cadastrado no banco.");
+                return;
+            }
+
+            beneficiarios[indiceEdicaoBenef].CPF = cpf;
+            beneficiarios[indiceEdicaoBenef].Nome = nome;
+
+            $('#modalEditarBenef').modal('hide');
+            atualizarTabelaBenef();
+        }
+    );
 }
 
 function removerBeneficiario(index) {
     beneficiarios.splice(index, 1);
+    indiceEdicaoBenef = null;
     atualizarTabelaBenef();
 }
 
@@ -165,23 +203,36 @@ $(document).ready(function () {
             return;
         }
 
+        if (!cpfValido(cpf)) {
+            ModalDialog("Atenção", "CPF do beneficiário inválido.");
+            return;
+        }
+
         if (beneficiarios.some(b => b.CPF === cpf)) {
             ModalDialog("Atenção", "Já existe um beneficiário com este CPF.");
             return;
         }
 
-        beneficiarios.push({
-            CPF: cpf,
-            Nome: nome
-        });
+        validarCpfBeneficiarioBanco(cpf, 0, function (existe) {
 
-        atualizarTabelaBenef();
+            if (existe) {
+                ModalDialog("Atenção", "Este CPF já está cadastrado na base.");
+                return;
+            }
 
-        $('#benefCPF').val('');
-        $('#benefNome').val('');
+            beneficiarios.push({
+                Id: 0,
+                CPF: cpf,
+                Nome: nome
+            });
+
+            atualizarTabelaBenef();
+
+            $('#benefCPF').val('');
+            $('#benefNome').val('');
+        });       
     });
-
-
+});
     $(document).on("input", ".cpf-mask", function () {
         this.value = maskCPF(this.value);
     });
@@ -207,6 +258,19 @@ $(document).ready(function () {
         $('#formCadastro #CPF').val(obj.CPF);
     }
 
+    if (typeof obj !== "undefined" && obj && obj.Beneficiarios && obj.Beneficiarios.length > 0) {
+
+        beneficiarios = obj.Beneficiarios.map(function (b) {
+            return {
+                Id: b.Id,
+                CPF: maskCPF(b.CPF),
+                Nome: b.Nome
+            };
+        });
+
+        atualizarTabelaBenef();
+    }
+
     $("#Email").on("blur", function () {
         if (!validarEmailSimples(this.value)) {
             ModalDialog("Atenção", "O e-mail deve conter '@'");
@@ -216,6 +280,14 @@ $(document).ready(function () {
 
     $('#formCadastro').submit(function (e) {
         e.preventDefault();
+
+        var cpfCliente = $(this).find("#CPF").val();
+
+        if (!cpfValido(cpfCliente)) {
+            ModalDialog("Atenção", "CPF do cliente inválido.");
+            $("#CPF").focus();
+            return;
+        };
 
         $.ajax({
             url: urlPost,
@@ -246,7 +318,69 @@ $(document).ready(function () {
             }
         });
     });
-});
+
+function validarCpfBeneficiarioBanco(cpf, idBeneficiario, callback) {
+
+    if (typeof obj === "undefined" || !obj || !obj.Id) {
+        callback(false);
+        return;
+    }
+
+    $.ajax({
+        url: '/Cliente/ValidarCpfBeneficiario',
+        method: 'GET',
+        data: {
+            idCliente: obj.Id,
+            cpf: cpf,
+            idBeneficiario: idBeneficiario === undefined || idBeneficiario === null
+                ? 0
+                : idBeneficiario
+        },
+        success: function (r) {
+            callback(r.existe === true);
+        },
+        error: function () {
+            ModalDialog("Erro", "Erro ao validar CPF do beneficiário.");
+            callback(true);
+        }
+    });
+}
+
+function cpfValido(cpf) {
+    cpf = cpf.replace(/\D/g, "");
+
+    if (cpf.length !== 11)
+        return false;
+
+    if (/^(\d)\1+$/.test(cpf))
+        return false;
+
+    var soma = 0;
+    var resto;
+
+    for (var i = 1; i <= 9; i++)
+        soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11)
+        resto = 0;
+
+    if (resto !== parseInt(cpf.substring(9, 10)))
+        return false;
+
+    soma = 0;
+    for (var i = 1; i <= 10; i++)
+        soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11)
+        resto = 0;
+
+    if (resto !== parseInt(cpf.substring(10, 11)))
+        return false;
+
+    return true;
+}
 
 function ModalDialog(titulo, texto) {
     var random = Math.random().toString().replace('.', '');

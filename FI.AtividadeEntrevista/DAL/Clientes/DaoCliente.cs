@@ -162,5 +162,20 @@ namespace FI.AtividadeEntrevista.DAL
 
             return lista;
         }
+
+        internal Cliente ConsultarPorCpf(string cpf)
+        {
+            List<System.Data.SqlClient.SqlParameter> parametros =
+                new List<System.Data.SqlClient.SqlParameter>();
+
+            parametros.Add(new System.Data.SqlClient.SqlParameter("CPF", cpf));
+
+            DataSet ds = base.Consultar("FI_SP_ConsClientePorCPF", parametros);
+
+            List<Cliente> clientes = Converter(ds);
+
+            return clientes.FirstOrDefault();
+        }
+
     }
 }
