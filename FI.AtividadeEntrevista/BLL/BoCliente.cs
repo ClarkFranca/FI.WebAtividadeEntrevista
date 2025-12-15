@@ -1,82 +1,112 @@
-﻿using System;
+﻿using FI.AtividadeEntrevista.DAL;
+using FI.AtividadeEntrevista.DML;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FI.AtividadeEntrevista.BLL
 {
     public class BoCliente
     {
-        /// <summary>
-        /// Inclui um novo cliente
-        /// </summary>
-        /// <param name="cliente">Objeto de cliente</param>
-        public long Incluir(DML.Cliente cliente)
+        public long Incluir(Cliente cliente)
         {
-            DAL.DaoCliente cli = new DAL.DaoCliente();
-            return cli.Incluir(cliente);
+            var daoCliente = new DaoCliente();
+            var boBeneficiario = new BoBeneficiario();
+
+            long idCliente = daoCliente.Incluir(cliente);
+
+            if (cliente.Beneficiarios != null && cliente.Beneficiarios.Any())
+            {
+                foreach (var benef in cliente.Beneficiarios)
+                {
+                    benef.IdCliente = idCliente;
+                    boBeneficiario.Incluir(benef);
+                }
+            }
+
+            return idCliente;
         }
 
-        /// <summary>
-        /// Altera um cliente
-        /// </summary>
-        /// <param name="cliente">Objeto de cliente</param>
-        public void Alterar(DML.Cliente cliente)
+        public void Alterar(Cliente cliente)
         {
-            DAL.DaoCliente cli = new DAL.DaoCliente();
-            cli.Alterar(cliente);
+            var daoCliente = new DaoCliente();
+            var boBenef = new BoBeneficiario();
+            var daoBenef = new DaoBeneficiario();
+
+            daoCliente.Alterar(cliente);
+
+            // Busca os beneficiários atuais do banco
+            var beneficiariosBanco = daoBenef.ListarPorCliente(cliente.Id)
+                                     ?? new List<Beneficiario>();
+
+            // CASO 1: veio NULL → remove todos
+            if (cliente.Beneficiarios == null || !cliente.Beneficiarios.Any())
+            {
+                foreach (var benef in beneficiariosBanco)
+                {
+                    boBenef.Excluir(benef.Id);
+                }
+                return;
+            }
+
+            // CASO 2: Excluir os que NÃO vieram da tela
+            foreach (var benefBanco in beneficiariosBanco)
+            {
+                if (!cliente.Beneficiarios.Any(b => b.Id == benefBanco.Id))
+                {
+                    boBenef.Excluir(benefBanco.Id);
+                }
+            }
+
+            // CASO 3: Inserir ou Alterar
+            foreach (var benef in cliente.Beneficiarios)
+            {
+                benef.IdCliente = cliente.Id;
+
+                if (benef.Id > 0)
+                {
+                    boBenef.Alterar(benef);
+                }
+                else
+                {
+                    boBenef.Incluir(benef);
+                }
+            }
         }
 
-        /// <summary>
-        /// Consulta o cliente pelo id
-        /// </summary>
-        /// <param name="id">id do cliente</param>
-        /// <returns></returns>
-        public DML.Cliente Consultar(long id)
+        public Cliente Consultar(long id)
         {
-            DAL.DaoCliente cli = new DAL.DaoCliente();
-            return cli.Consultar(id);
+            var daoCliente = new DaoCliente();
+            var daoBenef = new DaoBeneficiario();
+
+            var cliente = daoCliente.Consultar(id);
+
+            if (cliente != null)
+            {
+                cliente.Beneficiarios = daoBenef.ListarPorCliente(id)
+                                        ?? new List<Beneficiario>();
+            }
+
+            return cliente;
         }
 
-        /// <summary>
-        /// Excluir o cliente pelo id
-        /// </summary>
-        /// <param name="id">id do cliente</param>
-        /// <returns></returns>
         public void Excluir(long id)
         {
-            DAL.DaoCliente cli = new DAL.DaoCliente();
-            cli.Excluir(id);
+            new DaoCliente().Excluir(id);
         }
 
-        /// <summary>
-        /// Lista os clientes
-        /// </summary>
-        public List<DML.Cliente> Listar()
+        public List<Cliente> Listar()
         {
-            DAL.DaoCliente cli = new DAL.DaoCliente();
-            return cli.Listar();
+            return new DaoCliente().Listar();
         }
 
-        /// <summary>
-        /// Lista os clientes
-        /// </summary>
-        public List<DML.Cliente> Pesquisa(int iniciarEm, int quantidade, string campoOrdenacao, bool crescente, out int qtd)
+        public List<Cliente> Pesquisa(int iniciarEm, int quantidade, string campoOrdenacao, bool crescente, out int qtd)
         {
-            DAL.DaoCliente cli = new DAL.DaoCliente();
-            return cli.Pesquisa(iniciarEm,  quantidade, campoOrdenacao, crescente, out qtd);
+            return new DaoCliente().Pesquisa(iniciarEm, quantidade, campoOrdenacao, crescente, out qtd);
         }
 
-        /// <summary>
-        /// VerificaExistencia
-        /// </summary>
-        /// <param name="CPF"></param>
-        /// <returns></returns>
         public bool VerificarExistencia(string CPF)
         {
-            DAL.DaoCliente cli = new DAL.DaoCliente();
-            return cli.VerificarExistencia(CPF);
+            return new DaoCliente().VerificarExistencia(CPF);
         }
     }
 }

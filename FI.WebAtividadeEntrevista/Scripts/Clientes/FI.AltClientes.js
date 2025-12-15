@@ -10,7 +10,6 @@ function maskCPF(v) {
     return v;
 }
 
-
 function maskCEP(v) {
     v = v.replace(/\D/g, "");
     v = v.substring(0, 8);
@@ -76,6 +75,13 @@ function atualizarTabelaBenef() {
 }
 
 function editarBenefInline(index) {
+
+    if (indiceEdicaoBenef !== null && indiceEdicaoBenef !== index) {
+        atualizarTabelaBenef();
+    }
+
+    indiceEdicaoBenef = index;
+
     var linha = $(`tr[data-index="${index}"]`);
     var beneficiario = beneficiarios[index];
 
@@ -99,7 +105,6 @@ function editarBenefInline(index) {
         </button>
     `);
 }
-
 function salvarEdicaoInline(index) {
     var linha = $(`tr[data-index="${index}"]`);
     var novoCPF = linha.find('.cpf input').val();
@@ -115,12 +120,24 @@ function salvarEdicaoInline(index) {
         return;
     }
 
-    beneficiarios[index].CPF = novoCPF;
-    beneficiarios[index].Nome = novoNome;
+    validarCpfBeneficiarioBanco(
+        novoCPF,
+        beneficiarios[index].Id,
+        function (existe) {
 
-    atualizarTabelaBenef();
+            if (existe) {
+                ModalDialog("Atenção", "Este CPF já está cadastrado no banco.");
+                return;
+            }
+
+            beneficiarios[index].CPF = novoCPF;
+            beneficiarios[index].Nome = novoNome;
+
+            indiceEdicaoBenef = null;
+            atualizarTabelaBenef();
+        }
+    );
 }
-
 
 function editarBeneficiario(index) {
     indiceEdicaoBenef = index;
@@ -135,22 +152,38 @@ function salvarEdicaoBeneficiario() {
     var cpf = $('#editCPF').val();
     var nome = $('#editNome').val();
 
+    if (!cpf || !nome) {
+        ModalDialog("Atenção", "Informe CPF e Nome.");
+        return;
+    }
+
     if (beneficiarios.some((b, i) => b.CPF === cpf && i !== indiceEdicaoBenef)) {
         ModalDialog("Atenção", "Já existe outro beneficiário com este CPF.");
         return;
     }
 
-    beneficiarios[indiceEdicaoBenef] = {
-        CPF: cpf,
-        Nome: nome
-    };
+    validarCpfBeneficiarioBanco(
+        cpf,
+        beneficiarios[indiceEdicaoBenef].Id,
+        function (existe) {
 
-    $('#modalEditarBenef').modal('hide');
-    atualizarTabelaBenef();
+            if (existe) {
+                ModalDialog("Atenção", "Este CPF já está cadastrado no banco.");
+                return;
+            }
+
+            beneficiarios[indiceEdicaoBenef].CPF = cpf;
+            beneficiarios[indiceEdicaoBenef].Nome = nome;
+
+            $('#modalEditarBenef').modal('hide');
+            atualizarTabelaBenef();
+        }
+    );
 }
 
 function removerBeneficiario(index) {
     beneficiarios.splice(index, 1);
+    indiceEdicaoBenef = null;
     atualizarTabelaBenef();
 }
 
@@ -170,17 +203,26 @@ $(document).ready(function () {
             return;
         }
 
-        beneficiarios.push({
-            CPF: cpf,
-            Nome: nome
+        validarCpfBeneficiarioBanco(cpf, 0, function (existe) {
+
+            if (existe) {
+                ModalDialog("Atenção", "Este CPF já está cadastrado no banco.");
+                return;
+            }
+
+            beneficiarios.push({
+                Id: 0,
+                CPF: cpf,
+                Nome: nome
+            });
+
+            atualizarTabelaBenef();
+
+            $('#benefCPF').val('');
+            $('#benefNome').val('');
         });
 
-        atualizarTabelaBenef();
-
-        $('#benefCPF').val('');
-        $('#benefNome').val('');
     });
-
 
     $(document).on("input", ".cpf-mask", function () {
         this.value = maskCPF(this.value);
@@ -205,6 +247,19 @@ $(document).ready(function () {
         $('#formCadastro #Logradouro').val(obj.Logradouro);
         $('#formCadastro #Telefone').val(obj.Telefone);
         $('#formCadastro #CPF').val(obj.CPF);
+    }
+
+    if (typeof obj !== "undefined" && obj && obj.Beneficiarios && obj.Beneficiarios.length > 0) {
+
+        beneficiarios = obj.Beneficiarios.map(function (b) {
+            return {
+                Id: b.Id,
+                CPF: maskCPF(b.CPF),
+                Nome: b.Nome
+            };
+        });
+
+        atualizarTabelaBenef();
     }
 
     $("#Email").on("blur", function () {
@@ -247,6 +302,32 @@ $(document).ready(function () {
         });
     });
 });
+function validarCpfBeneficiarioBanco(cpf, idBeneficiario, callback) {
+
+    if (typeof obj === "undefined" || !obj || !obj.Id) {
+        callback(false);
+        return;
+    }
+
+    $.ajax({
+        url: '/Cliente/ValidarCpfBeneficiario',
+        method: 'GET',
+        data: {
+            idCliente: obj.Id,
+            cpf: cpf,
+            idBeneficiario: idBeneficiario === undefined || idBeneficiario === null
+                ? 0
+                : idBeneficiario
+        },
+        success: function (r) {
+            callback(r.existe === true);
+        },
+        error: function () {
+            ModalDialog("Erro", "Erro ao validar CPF do beneficiário.");
+            callback(true);
+        }
+    });
+}
 
 function ModalDialog(titulo, texto) {
     var random = Math.random().toString().replace('.', '');

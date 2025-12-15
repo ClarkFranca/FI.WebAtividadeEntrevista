@@ -24,37 +24,54 @@ namespace WebAtividadeEntrevista.Controllers
         [HttpPost]
         public JsonResult Incluir(ClienteModel model)
         {
-            BoCliente bo = new BoCliente();
-            
-            if (!this.ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
-                List<string> erros = (from item in ModelState.Values
-                                      from error in item.Errors
-                                      select error.ErrorMessage).ToList();
+                var erros = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
 
                 Response.StatusCode = 400;
                 return Json(string.Join(Environment.NewLine, erros));
             }
-            else
-            {
-                
-                model.Id = bo.Incluir(new Cliente()
-                {                    
-                    CEP = model.CEP,
-                    Cidade = model.Cidade,
-                    Email = model.Email,
-                    Estado = model.Estado,
-                    Logradouro = model.Logradouro,
-                    Nacionalidade = model.Nacionalidade,
-                    Nome = model.Nome,
-                    Sobrenome = model.Sobrenome,
-                    Telefone = model.Telefone,
-                    CPF = model.CPF
-                });
 
-           
-                return Json("Cadastro efetuado com sucesso");
+            var cliente = new Cliente
+            {
+                CEP = model.CEP,
+                Cidade = model.Cidade,
+                Email = model.Email,
+                Estado = model.Estado,
+                Logradouro = model.Logradouro,
+                Nacionalidade = model.Nacionalidade,
+                Nome = model.Nome,
+                Sobrenome = model.Sobrenome,
+                Telefone = model.Telefone,
+                CPF = model.CPF,
+                Beneficiarios = model.Beneficiarios?.Select(b => new Beneficiario
+                {
+                    Id = b.Id,
+                    Nome = b.Nome,
+                    CPF = b.CPF
+                }).ToList()
+            };
+
+            if (model.Beneficiarios != null)
+            {
+                var boBenef = new BoBeneficiario();
+
+                foreach (var benef in model.Beneficiarios)
+                {
+                    if (boBenef.ExistePorCpf(0, benef.CPF))
+                    {
+                        Response.StatusCode = 400;
+                        return Json($"CPF {benef.CPF} já está cadastrado.");
+                    }
+                }
             }
+
+            new BoCliente().Incluir(cliente);
+
+            return Json("Cadastro efetuado com sucesso");
         }
 
         [HttpPost]
@@ -73,6 +90,27 @@ namespace WebAtividadeEntrevista.Controllers
             }
             else
             {
+                if (model.Beneficiarios != null)
+                {
+                    var boBenef = new BoBeneficiario();
+
+                    foreach (var benef in model.Beneficiarios)
+                    {
+                        bool existe = boBenef.ExistePorCpf(model.Id, benef.CPF);
+
+                        if (existe)
+                        {
+                            var benefBanco = boBenef.Consultar(benef.Id);
+
+                            if (benefBanco == null || benefBanco.CPF != benef.CPF)
+                            {
+                                Response.StatusCode = 400;
+                                return Json($"CPF {benef.CPF} já está cadastrado para este cliente.");
+                            }
+                        }
+                    }
+                }
+
                 bo.Alterar(new Cliente()
                 {
                     Id = model.Id,
@@ -85,9 +123,16 @@ namespace WebAtividadeEntrevista.Controllers
                     Nome = model.Nome,
                     Sobrenome = model.Sobrenome,
                     Telefone = model.Telefone,
-                    CPF = model.CPF
+                    CPF = model.CPF,
+
+                    Beneficiarios = model.Beneficiarios?.Select(b => new Beneficiario
+                    {
+                        Id = b.Id,
+                        CPF = b.CPF,
+                        Nome = b.Nome
+                    }).ToList()
                 });
-                               
+
                 return Json("Cadastro alterado com sucesso");
             }
         }
@@ -95,13 +140,14 @@ namespace WebAtividadeEntrevista.Controllers
         [HttpGet]
         public ActionResult Alterar(long id)
         {
-            BoCliente bo = new BoCliente();
-            Cliente cliente = bo.Consultar(id);
-            Models.ClienteModel model = null;
+            var bo = new BoCliente();
+            var cliente = bo.Consultar(id);
+
+            ClienteModel model = null;
 
             if (cliente != null)
             {
-                model = new ClienteModel()
+                model = new ClienteModel
                 {
                     Id = cliente.Id,
                     CEP = cliente.CEP,
@@ -113,8 +159,15 @@ namespace WebAtividadeEntrevista.Controllers
                     Nome = cliente.Nome,
                     Sobrenome = cliente.Sobrenome,
                     Telefone = cliente.Telefone,
-                    CPF = cliente.CPF
-                };            
+                    CPF = cliente.CPF,
+
+                    Beneficiarios = cliente.Beneficiarios?.Select(b => new BeneficiarioModel
+                    {
+                        Id = b.Id,
+                        CPF = b.CPF,
+                        Nome = b.Nome
+                    }).ToList()
+                };
             }
 
             return View(model);
@@ -146,5 +199,36 @@ namespace WebAtividadeEntrevista.Controllers
                 return Json(new { Result = "ERROR", Message = ex.Message });
             }
         }
+
+        [HttpGet]
+        public JsonResult ValidarCpfBeneficiario(long idCliente, string cpf, long idBeneficiario = 0)
+        {
+            cpf = cpf.Replace(".", "").Replace("-", "");
+
+            var bo = new BoBeneficiario();
+
+            // Verifica se existe CPF no banco (GLOBAL)
+            bool existe = bo.ExistePorCpf(idCliente, cpf);
+
+            // Se estiver editando
+            if (idBeneficiario > 0)
+            {
+                var benef = bo.Consultar(idBeneficiario);
+
+                // Ignora somente se:
+                // - o beneficiário existir
+                // - o CPF for o mesmo
+                // - o cliente for o mesmo
+                if (benef != null &&
+                    benef.CPF.Replace(".", "").Replace("-", "") == cpf &&
+                    benef.IdCliente == idCliente)
+                {
+                    existe = false;
+                }
+            }
+
+            return Json(new { existe }, JsonRequestBehavior.AllowGet);
+        }
+
     }
 }
