@@ -1,0 +1,14 @@
+﻿CREATE PROC FI_SP_ListBeneficiariosPorCliente
+(
+    @IDCLIENTE BIGINT
+)
+AS
+BEGIN
+    SELECT 
+        ID,
+        CPF,
+        NOME,
+        IDCLIENTE
+    FROM BENEFICIARIOS
+    WHERE IDCLIENTE = @IDCLIENTE
+END
