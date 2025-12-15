@@ -34,6 +34,10 @@ namespace WebAtividadeEntrevista.Controllers
                 return Json(string.Join(Environment.NewLine, erros));
             }
 
+            var cpfSemMascara = model.CPF
+            .Replace(".", "")
+            .Replace("-", "");
+
             var cliente = new Cliente
             {
                 CEP = model.CEP,
@@ -45,12 +49,12 @@ namespace WebAtividadeEntrevista.Controllers
                 Nome = model.Nome,
                 Sobrenome = model.Sobrenome,
                 Telefone = model.Telefone,
-                CPF = model.CPF,
+                CPF = cpfSemMascara,
                 Beneficiarios = model.Beneficiarios?.Select(b => new Beneficiario
                 {
                     Id = b.Id,
                     Nome = b.Nome,
-                    CPF = b.CPF
+                    CPF = b.CPF.Replace(".", "").Replace("-", "")
                 }).ToList()
             };
 
@@ -149,12 +153,12 @@ namespace WebAtividadeEntrevista.Controllers
                     Nome = model.Nome,
                     Sobrenome = model.Sobrenome,
                     Telefone = model.Telefone,
-                    CPF = model.CPF,
+                    CPF = model.CPF.Replace(".", "").Replace("-", ""),
 
                     Beneficiarios = model.Beneficiarios?.Select(b => new Beneficiario
                     {
                         Id = b.Id,
-                        CPF = b.CPF,
+                        CPF = b.CPF.Replace(".", "").Replace("-", ""),
                         Nome = b.Nome
                     }).ToList()
                 });
